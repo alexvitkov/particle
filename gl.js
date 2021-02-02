@@ -107,13 +107,13 @@ class ParticleSystem {
                 equation = equation.replace("#" + macro[0], `(${macro[1]})`);
         }
 
-        return equation.replaceAll("$t",     this.burst ? "aTime" : "adjustedTime")
-                       .replaceAll("$i",     "aVertexPosition.z")
-                       .replaceAll("$rand1", "aVertexPosition.w")
-                       .replaceAll("$rand2", "aRandom1.x")
-                       .replaceAll("$rand3", "aRandom1.y")
-                       .replaceAll("$rand4", "aRandom1.z")
-                       .replaceAll("$rand5", "aRandom1.w");
+        return "(" + equation.replaceAll("$t",     this.burst ? "aTime" : "adjustedTime")
+                             .replaceAll("$i",     "aVertexPosition.z")
+                             .replaceAll("$rand1", "aVertexPosition.w")
+                             .replaceAll("$rand2", "aRandom1.x")
+                             .replaceAll("$rand3", "aRandom1.y")
+                             .replaceAll("$rand4", "aRandom1.z")
+                             .replaceAll("$rand5", "aRandom1.w") + ")";
     }
 
     init() {
