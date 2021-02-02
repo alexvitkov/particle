@@ -39,6 +39,10 @@ class ParticleSystem {
         this.yEquation = "$t * $rand2";
         this.zEquation = "$t * $rand3";
 
+        this.rEquation = "1.0";
+        this.gEquation = "1.0";
+        this.bEquation = "1.0";
+
         this.pitchEquation = "$rand1";
         this.yawEquation = "$rand2";
         this.distEquation = "$t";
@@ -137,7 +141,7 @@ class ParticleSystem {
             uniform mediump float aTime;
 
             varying highp vec2 vTextureCoord;
-            varying highp float alpha;
+            varying highp vec4 vRGBAmultiplier;
 
             void main(void) {
                 float adjustedTime = aTime + aVertexPosition.z;
@@ -146,7 +150,12 @@ class ParticleSystem {
 
                 vTextureCoord = vec2(aVertexPosition.x / 2.0 + 0.5, 0.5 - aVertexPosition.y / 2.0);
 
-                alpha = ${this.translate_equation(this.alphaEquation)};
+                vRGBAmultiplier = vec4(
+                    ${this.translate_equation(this.rEquation)},
+                    ${this.translate_equation(this.gEquation)},
+                    ${this.translate_equation(this.bEquation)},
+                    ${this.translate_equation(this.alphaEquation)}
+                );
 
                 vec4 center = vec4(0, 0, 0, 1);
         `;
@@ -184,13 +193,16 @@ class ParticleSystem {
 
         const frag = `
             varying highp vec2 vTextureCoord;
-            uniform sampler2D uSampler;
+            varying highp vec4 vRGBAmultiplier;
 
-            varying highp float alpha;
+            uniform sampler2D uSampler;
 
             void main(void) {
                 highp vec4 x = texture2D(uSampler, vTextureCoord);
-                x.rgba *= alpha * x.a;
+
+                x.rgba *= vRGBAmultiplier;
+                x.rgba *= vRGBAmultiplier.a * x.a;
+
                 gl_FragColor = x;
             }`;
 
@@ -364,6 +376,9 @@ function save() {
             xEquation:     ps.xEquation,
             yEquation:     ps.yEquation,
             zEquation:     ps.zEquation,
+            rEquation:     ps.rEquation,
+            gEquation:     ps.gEquation,
+            bEquation:     ps.bEquation,
             pitchEquation: ps.pitchEquation,
             yawEquation:   ps.yawEquation,
             distEquation:  ps.distEquation,
@@ -416,6 +431,9 @@ function load(e) {
             ps.xEquation     = s.xEquation;
             ps.yEquation     = s.yEquation;
             ps.zEquation     = s.zEquation;
+            ps.rEquation     = s.rEquation;
+            ps.gEquation     = s.gEquation;
+            ps.bEquation     = s.bEquation;
             ps.pitchEquation = s.pitchEquation;
             ps.yawEquation   = s.yawEquation;
             ps.distEquation  = s.distEquation;
@@ -477,6 +495,10 @@ function updateSidebar() {
             }
             updateSidebar();
         }
+
+        cartesian.push(mkselector(li, "R", ps, 'rEquation'));
+        cartesian.push(mkselector(li, "G", ps, 'gEquation'));
+        cartesian.push(mkselector(li, "B", ps, 'bEquation'));
 
         var bottom_div = mk('div');
         bottom_div.appendChild(delete_btn);
