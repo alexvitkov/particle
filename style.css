@@ -7,33 +7,114 @@ body, html {
     padding: 0;
     height: 100%;
     font-family: sans-serif;
+
 }
 
 body {
-    background: #060e12;
     display: flex;
-    color: white;
+    max-height: 100%;
 }
 
 #main {
     flex: 1 0 0;
     text-align: center;
-    display: flex;
     justify-content: center;
     align-items: center;
+
+    display: flex;
+    flex-direction: column;
 }
 
 canvas {
-    border: 1px solid #1b2d38;
-    flex: 0 0 640px;
-    height: 480px;
+    border-radius: 10px;
+    background: black;
+    flex: 0 0 800px;
+    height: 600px;
 }
 
 #sidebar {
-    flex: 0 0 230px;
-    background: #0e1c24;
-    border-left: 1px solid #1b2d38;
-    padding: 5px;
+    flex: 0 0 350px;
+    background: #ccc;
+    border-left: 1px solid #aaa;
+    padding: 0px;
+
+    display: flex;
+    flex-direction: column;
+}
+
+#systems {
+    padding: 0;
+    margin: 0;
+    list-style-type: none;
+
+    overflow-y: scroll;
+    box-sizing: border-box;
+}
+
+.input, input, button {
+    background: #f7f7f7;
+    border: 1px solid #aaa;
+    padding: 3px 10px;
+    margin: 3px 5px;
+    border-radius: 4px;
+    min-width: 0;
+    color: #222;
+}
+
+button, .input {
+    font-family: inherit;
+    font-size: inherit;
+    padding: 8px 20px 5px 20px;
+    cursor: pointer;
+    color: black;
+}
+
+input:focus, 
+button:hover, 
+.input:hover {
+    background: white;
+}
+
+.red_button {
+    background: #f28395;
+}
+
+.red_button:hover {
+    background: #fa98a8;
+}
+
+#systems > li {
+    margin: 5px;
+    padding: 15px 5px;
+    background: #eee;
+    border: 1px solid #aaa;
+    border-radius: 5px;
+}
+
+#systems > li > * {
+    margin-bottom: 10px;
+}
+
+#systems > li >  * {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    flex-direction: row;
+    margin-bottom: 5px;
+}
+
+#systems > li >  * > input {
+    flex: 1 0 0;
+}
+
+#systems > li > *:last-child {
+    margin-bottom: 0px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+input, button { 
+
 }
 
 video {

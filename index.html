@@ -9,10 +9,25 @@
   <body>
 
     <div id="main">
-        <canvas id="glcanvas" width="640" height="480"></canvas>
+        <canvas id="glcanvas" width="800" height="600"></canvas>
+        <div id="time">Време: 0</div>
     </div>
 
-    <div id="sidebar">asdf</div>
+    <div id="sidebar">
+
+        <div>
+            <button onclick="save()">Запиши</button>
+            <label for="load" class="input">Зареди</label>
+        </div>
+
+        <button onclick="createSystem()">Добави система</button>
+
+        <ul id="systems">
+        </ul>
+
+    </div>
+
+    <input type="file" style="display:none;" id="load" accept=".json">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js" crossorigin="anonymous"></script>
     <script src="gl.js" defer></script>
