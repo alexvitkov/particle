@@ -399,6 +399,16 @@ function mkselector(parent, label_text, ps, str, type, fn) {
             input.checked = ps[str];
             break;
         }
+        case "float":  {
+            input.onchange = (e) => { 
+                ps[str]  = parseFloat(input.value);
+                ps.init();
+                if (fn)
+                    fn(input.value);
+            }
+            input.value = ps[str];
+            break;
+        }
         default: {
             input.onchange = (e) => { 
                 ps[str]  = input.value; 
@@ -624,9 +634,9 @@ function updateSidebar() {
         mkseparator(li);
 
         mkselector(li, "Взрив", ps, 'burst', 'boolean', update_burst);
-        const start = mkselector(li, "Начало",       ps, 'start');
-        const dur = mkselector(li, "Продължителност", ps, 'duration');
-        const ts = mkselector(li, "Time Scale",   ps, 'timeScale');
+        const start = mkselector(li, "Начало",          ps, 'start',    'float');
+        const dur   = mkselector(li, "Продължителност", ps, 'duration', 'float');
+        const ts    = mkselector(li, "Time Scale",      ps, 'timeScale');
         mkseparator(li);
 
 
@@ -674,9 +684,9 @@ function updateSidebar() {
             updateSidebar();
         }
 
-        cartesian.push(mkselector(li, "R", ps, 'rEquation'));
-        cartesian.push(mkselector(li, "G", ps, 'gEquation'));
-        cartesian.push(mkselector(li, "B", ps, 'bEquation'));
+        mkselector(li, "R", ps, 'rEquation');
+        mkselector(li, "G", ps, 'gEquation');
+        mkselector(li, "B", ps, 'bEquation');
         mkselector(li, "Прозрачност",  ps, 'alphaEquation');
 
         var bottom_div = mk('div');
