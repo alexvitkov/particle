@@ -344,6 +344,20 @@ function beginDrag(e) {
     prevY = e.clientY;
 }
 
+function updateView() {
+        mat4.copy(viewMatrix, viewMatrixBase);
+
+        mat4.rotate(viewMatrix,
+            viewMatrix,
+            yrot,
+            [1, 0, 0]);
+
+        mat4.rotate(viewMatrix,
+            viewMatrix,
+            xrot,
+            [0, 1, 0]);
+}
+
 function onMouseMove(e) {
     if (dragging) {
         xrot += 4 * (e.clientX - prevX) / canvas.width;
@@ -357,17 +371,7 @@ function onMouseMove(e) {
         prevX = e.clientX;
         prevY = e.clientY;
 
-        mat4.copy(viewMatrix, viewMatrixBase);
-
-        mat4.rotate(viewMatrix,
-            viewMatrix,
-            yrot,
-            [1, 0, 0]);
-
-        mat4.rotate(viewMatrix,
-            viewMatrix,
-            xrot,
-            [0, 1, 0]);
+        updateView();
     }
 }
 
@@ -465,6 +469,7 @@ function createMacro(m) {
 
 function save() {
     var file = { 
+        animation_duration: animation_duration,
         macros: macros,
         systems: []
     };
@@ -517,59 +522,89 @@ function save() {
     });
 }
 
+// Тази функция зарежда Particle системите от JSON string
+function load(str) {
+    time = 0;
+    xrot = 0;
+    yrot = 0;
+    updateView();
+
+    let json = JSON.parse(str);
+
+    systems = [];
+    macros = [];
+    var macros_div = document.getElementById('macros');
+    while (macros_div.firstChild)
+        macros_div.removeChild(macros_div.firstChild);
+
+    for (const macro of json.macros) {
+        createMacro(macro);
+    }
+
+    animation_duration = json.animation_duration;
+    document.getElementById('animLengthInput').value = animation_duration;
+
+    for (let s of json.systems) {
+        var ps = createSystem();
+
+        ps.particleCount = s.particleCount;
+        ps.texture       = s.texture;
+        ps.sizeEquation  = s.sizeEquation;
+
+        ps.burst         = s.burst;
+        ps.start         = s.start;
+        ps.duration      = s.duration;
+        ps.timeScale     = s.timeScale;
+
+        ps.spherical     = s.spherical;
+        ps.pitchEquation = s.pitchEquation;
+        ps.yawEquation   = s.yawEquation;
+        ps.distEquation  = s.distEquation;
+
+        ps.cartesian     = s.cartesian;
+        ps.xEquation     = s.xEquation;
+        ps.yEquation     = s.yEquation;
+        ps.zEquation     = s.zEquation;
+
+        ps.rEquation     = s.rEquation;
+        ps.gEquation     = s.gEquation;
+        ps.bEquation     = s.bEquation;
+        ps.alphaEquation = s.alphaEquation;
+
+        ps.init();
+    }
+
+    updateSidebar();
+}
+
 
 // Тази функция зарежда Particle системите от JSON файл
-function load(e) {
+function load_from_file(e) {
     var files = document.getElementById('loadFiles').files;
-
     if (files.length == 0)
         return;
     
     var reader = new FileReader();
     reader.readAsText(files[0]);
 
-    systems = [];
 
     reader.addEventListener('load', (event) => {
         let data = event.target.result;
-        let json = JSON.parse(data);
-
-        for (const macro of json_macros) {
-            createMacro(macro);
-        }
-
-        for (let s of json.systems) {
-            var ps = createSystem();
-
-            ps.particleCount = s.particleCount;
-            ps.texture       = s.texture;
-            ps.sizeEquation  = s.sizeEquation;
-
-            ps.burst         = s.burst;
-            ps.start         = s.start;
-            ps.duration      = s.duration;
-            ps.timeScale     = s.timeScale;
-
-            ps.spherical     = s.spherical;
-            ps.pitchEquation = s.pitchEquation;
-            ps.yawEquation   = s.yawEquation;
-            ps.distEquation  = s.distEquation;
-
-            ps.cartesian     = s.cartesian;
-            ps.xEquation     = s.xEquation;
-            ps.yEquation     = s.yEquation;
-            ps.zEquation     = s.zEquation;
-
-            ps.rEquation     = s.rEquation;
-            ps.gEquation     = s.gEquation;
-            ps.bEquation     = s.bEquation;
-            ps.alphaEquation = s.alphaEquation;
-
-            ps.init();
-        }
-
-        updateSidebar();
+        load(data);
     });
+}
+
+function load_from_preset(preset_url) {
+    var oReq = new XMLHttpRequest();
+
+    oReq.onload = function(e) {
+        var txt = oReq.responseText;
+        if (txt)
+            load(txt);
+    }
+
+    oReq.open("GET", preset_url);
+    oReq.send();
 }
 
 // Изтрива елементите от стария sidebar, ако има такива
@@ -653,7 +688,29 @@ function updateSidebar() {
     }
 }
 
+function loadPresets() {
+    var oReq = new XMLHttpRequest();
+
+    oReq.onload = function(e) {
+        var txt = oReq.responseText;
+
+        for (const preset_url of txt.match(/[^\r\n]+/g)) {
+            const btn = mk('button');
+            btn.innerText = preset_url;
+            document.getElementById('presets').appendChild(btn);
+            btn.onclick = () => {
+                load_from_preset(preset_url);
+            }
+        }
+    }
+
+    oReq.open("GET", "presets.txt");
+    oReq.send();
+}
+
 function main() {
+    loadPresets();
+
     canvas = document.getElementById('glcanvas');
 
     // Handler-и за дърпане с мишка
@@ -663,7 +720,7 @@ function main() {
 
     // Ако потребителя качи файл със 'Зареди' бутона,
     // извикваме функцията за зареждане
-    document.getElementById('loadFiles').onchange = load;
+    document.getElementById('loadFiles').onchange = load_from_file;
 
     // Инициализация на WebGL
     gl = canvas.getContext('webgl');
@@ -814,8 +871,5 @@ function compileShader(gl, type, source) {
     return shader;
 }
 
-function loadPresets() {
-
-}
 
 main();

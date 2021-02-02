@@ -139,3 +139,17 @@ button:hover,
 video {
 	display: none;
 }
+
+#presets {
+    display: flex;
+    flex-direction: column;
+
+    font-size: 15px;
+    flex: 0 1 200px;
+    background: #ccc;
+    max-height: 100%;
+    padding: 3px;
+    gap: 2px;
+    box-sizing: border-box;
+    border-right: 1px solid #999;
+}

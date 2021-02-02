@@ -1,3 +1,6 @@
 presets/огън.json
 presets/фонтан.json
 presets/хвърчокоптер.json
+presets/плазма.json
+presets/фойерверки.json
+presets/космос.json
