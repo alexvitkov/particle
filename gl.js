@@ -1,20 +1,48 @@
-var canvas, gl;
-var randomBuffer;
+var canvas;
+var gl;
 
 var projMatrix;
-var viewMatrixBase;
-var viewMatrix;
 
-var random1;
-var texture;
+// viewMatrixBase е матрицата на транслация [0, 0, -Z]
+// Използваме я да сметнем viewMatrix, като viewMatrix
+// е viewMatrixbase, но завъртяна въз основа на xrot и yrot
+var viewMatrixBase, viewMatrix;
 
-// var macros = [];
+// ъгъла на камерата в радиани
+var xrot = 0, yrot = 0;
+
+// Понеже изразите, които потребителя може да въвежда стават доста големи
+// му даваме да си дефинира макроси, които да преизползва.
+// Макрото с име 'foo' може да бъде извикано от израз с '#foo'
+var macros = [];
+
+// Array със всичките particle системи
 var systems = [];
 
-function id(i) {
-    return document.getElementById(i);
-}
+// Ако в момента drag-ваме с десен бутон, dragging е true
+// а prevX и prevY са x и y на курсора миналия кадър, ползваме ги
+// да пресметнем с колко трябва да променим ъгъла на камерата
+var dragging = false;
+var prevX, prevY;
 
+
+// 0.0 - начало на анимацията, 10.0 - 10 секунди в анимацията, ...
+var time = 0;
+
+// Максимална дължина на анимацията
+var animation_duration = 5.0;
+
+// времето отначало на страницата, ползваме го за да сметнем
+// delta-time от миналия кадър до сегашния
+var now = performance.now();
+
+// Голям буфер със случайни стойности.
+// TODO - ще е по-добре всяка система да има свой собствен seed
+// вместо глобален буфер
+var random1;
+
+
+// помощна функция за създаване на HTML елементи
 function mk(type, _class) {
     var el = document.createElement(type);
     if (_class)
@@ -25,38 +53,60 @@ function mk(type, _class) {
 }
 
 class ParticleSystem {
-    constructor(particleCount, duration) {
-        this.burst = true;
-        this.cartesian = false;
-        this.spherical = true;
-        this.particleCount = particleCount;
-        this.xscale = 1;
-        this.yscale = 1;
-        this.timeScale = 1;
-        this.duration = duration;
+    constructor() {
+        this.texture = "default.png";
+        this.particleCount = 100;
 
+        // Ако burst е true, всичките частици се появяват наведнъж.
+        // В такъв случай се ползват start и duration.
+        this.burst = true;
+        this.start    = 0.0;
+        this.duration = 2.0;
+
+        // Ако burst е false, частиците се появяват една по една
+        // и системата loop-ва. В такъв случай се ползва 'timeScale'
+        this.timeScale = 1;
+
+        // Ако cartesian е true, потребителят може да задава X, Y, Z
+        // на отделните частици чрез математически формули
+        this.cartesian = false;
         this.xEquation = "$t * $rand1";
         this.yEquation = "$t * $rand2";
         this.zEquation = "$t * $rand3";
 
-        this.rEquation = "1.0";
-        this.gEquation = "1.0";
-        this.bEquation = "1.0";
-
+        // Ако spherical е true, потребителят може да задава
+        // сферичните координати на частиците чрез формули.
+        // Възможно е cartesian и spherical едновременно да са true,
+        // в който случай двата чифта координати се събират.
+        this.spherical = true;
         this.pitchEquation = "$rand1";
         this.yawEquation = "$rand2";
         this.distEquation = "$t";
 
+        this.rEquation = "1.0";
+        this.gEquation = "1.0";
+        this.bEquation = "1.0";
         this.alphaEquation = "1.0 - $t";
-
+        
         this.sizeEquation = "0.05";
 
-        this.init_shaders();
-        this.init_buffer();
+        // Понеже даваме на потребителя да въвежда формули,
+        // които отиват директно в шейдъра, е възможно шейдърът да се счупи.
+        // В такъв случай this.broken става true, и не рендрираме счупената
+        // система.
+        this.broken = false;
+
+        this.init();
     }
 
-    // Функцията превежда променливите, които даваме на потребителя - $t, $rand1, ...
+    // Функцията превежда променливите, които даваме на потребителя
+    // както и макросите, които той сам е дефинирал
     translate_equation(equation) {
+        for (const macro of macros) {
+            if (macro[0])
+                equation = equation.replace("#" + macro[0], `(${macro[1]})`);
+        }
+
         return equation.replaceAll("$t",     this.burst ? "aTime" : "adjustedTime")
                        .replaceAll("$i",     "aVertexPosition.z")
                        .replaceAll("$rand1", "aVertexPosition.w")
@@ -66,7 +116,17 @@ class ParticleSystem {
                        .replaceAll("$rand5", "aRandom1.w");
     }
 
-    init_buffer() {
+    init() {
+        this.create_buffer();
+        this.create_shaders();
+    }
+
+    // на Vertex шейдъра подаваме като аргумент един огромен буфер,
+    // в който са енкодирани всичките данни, 
+    // които се променят от частица на частица
+    create_buffer() {
+        this.img = loadTexture(this.texture);
+
         // правим particleCount на брой квадратчета
         //
         // В positions буфера енкодидаме:
@@ -126,7 +186,7 @@ class ParticleSystem {
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
     }
 
-    init_shaders() {
+    create_shaders() {
         var vert = `
             #define PI  3.1415926538
             #define TAU 6.2831853076
@@ -207,8 +267,10 @@ class ParticleSystem {
             }`;
 
         this.program = makeShaderProgram(gl, vert, frag);
-        if (!this.program)
+        if (!this.program) {
+            this.broken = true;
             return;
+        }
 
         this.programInfo = {
             vertexPosition: gl.getAttribLocation(this.program, 'aVertexPosition'),
@@ -219,6 +281,7 @@ class ParticleSystem {
             sampler: gl.getUniformLocation(this.program, 'uSampler'),
             time: gl.getUniformLocation(this.program, 'aTime'),
         };
+        this.broken = false;
     }
 }
 
@@ -227,8 +290,16 @@ function isPowerOf2(x) {
     return x == 512 || x == 256;
 }
 
+loaded_textures = {};
+
 function loadTexture(url) {
+    if (url in loaded_textures) {
+        return loaded_textures[url];
+    }
+
     const texture = gl.createTexture();
+    loaded_textures[url] = texture;
+
     gl.bindTexture(gl.TEXTURE_2D, texture);
 
     const level = 0;
@@ -260,17 +331,12 @@ function loadTexture(url) {
     image.src = url;
 
     image.onerror = () => {
-        alert(0)
+        alert(`Текстурата '${url}' не можа да се зареди`);
     }
 
     return texture;
 } 
 
-var dragging = false;
-var prevX, prevY;
-
-var xrot = 0;
-var yrot = 0;
 
 function beginDrag(e) {
     dragging = true;
@@ -322,8 +388,7 @@ function mkselector(parent, label_text, ps, str, type, fn) {
             input.type = "checkbox";
             input.onchange = (e) => { 
                 ps[str]  = input.checked;
-                ps.init_buffer();
-                ps.init_shaders();
+                ps.init();
                 if (fn)
                     fn(input.checked);
             }
@@ -333,8 +398,7 @@ function mkselector(parent, label_text, ps, str, type, fn) {
         default: {
             input.onchange = (e) => { 
                 ps[str]  = input.value; 
-                ps.init_buffer();
-                ps.init_shaders();
+                ps.init();
                 if (fn)
                     fn(input.value);
             }
@@ -351,37 +415,87 @@ function mkselector(parent, label_text, ps, str, type, fn) {
     return div;
 }
 
+function mkseparator(li) {
+    li.appendChild(mk('div', 'separator'));
+}
+
 function createSystem() {
-    var ps = new ParticleSystem(100)
+    var ps = new ParticleSystem();
     systems.push(ps);
 
     updateSidebar();
     return ps;
 }
 
+function createMacro(m) {
+    var div = mk('div', 'macro');
+
+    var macro = m || ['foo', '1 + 2 + 3'];
+
+    var name = mk('input');
+    var val  = mk('input');
+    name.value = macro[0];
+    val.value  = macro[1];
+
+    name.onchange = (_) => { macro[0] = name.value; }
+    val.onchange  = (_) => { 
+        macro[1] =  val.value; 
+        for (const ps of systems)
+            ps.init();
+    }
+
+    var delete_btn = mk('button', 'red_button');
+    delete_btn.innerText = 'X';
+
+    delete_btn.onclick = () => {
+        var index = macros.indexOf(macro);
+        if (index >= 0) {
+            macros.splice(index, 1);
+            document.getElementById('macros').removeChild(div);
+        }
+    };
+    
+    div.appendChild(name);
+    div.appendChild(val);
+    div.appendChild(delete_btn);
+
+    macros.push(macro);
+    document.getElementById('macros').appendChild(div);
+}
+
 function save() {
     var file = { 
+        macros: macros,
         systems: []
     };
 
     for (var ps of systems) {
         var serialized = {
-            cartesian:     ps.cartesian,
-            spherical:     ps.spherical,
-            burst:         ps.burst,
+            texture:       ps.texture,
             particleCount: ps.particleCount,
-            timeScale:     ps.timeScale,
             sizeEquation:  ps.sizeEquation,
-            alphaEquation: ps.alphaEquation,
+
+            burst:         ps.burst,
+            start:         ps.start,
+            duration:      ps.duration,
+            timeScale:     ps.timeScale,
+
+            cartesian:     ps.cartesian,
             xEquation:     ps.xEquation,
             yEquation:     ps.yEquation,
             zEquation:     ps.zEquation,
-            rEquation:     ps.rEquation,
-            gEquation:     ps.gEquation,
-            bEquation:     ps.bEquation,
+
+            spherical:     ps.spherical,
             pitchEquation: ps.pitchEquation,
             yawEquation:   ps.yawEquation,
             distEquation:  ps.distEquation,
+
+            
+            rEquation:     ps.rEquation,
+            gEquation:     ps.gEquation,
+            bEquation:     ps.bEquation,
+            alphaEquation: ps.alphaEquation,
+
         }
         file.systems.push(serialized);
     }
@@ -403,8 +517,10 @@ function save() {
     });
 }
 
+
+// Тази функция зарежда Particle системите от JSON файл
 function load(e) {
-    var files = id('load').files;
+    var files = document.getElementById('loadFiles').files;
 
     if (files.length == 0)
         return;
@@ -418,36 +534,48 @@ function load(e) {
         let data = event.target.result;
         let json = JSON.parse(data);
 
+        for (const macro of json_macros) {
+            createMacro(macro);
+        }
+
         for (let s of json.systems) {
             var ps = createSystem();
 
-            ps.cartesian     = s.cartesian;
-            ps.spherical     = s.spherical;
-            ps.burst         = s.burst;
             ps.particleCount = s.particleCount;
-            ps.timeScale     = s.timeScale;
+            ps.texture       = s.texture;
             ps.sizeEquation  = s.sizeEquation;
-            ps.alphaEquation = s.alphaEquation;
-            ps.xEquation     = s.xEquation;
-            ps.yEquation     = s.yEquation;
-            ps.zEquation     = s.zEquation;
-            ps.rEquation     = s.rEquation;
-            ps.gEquation     = s.gEquation;
-            ps.bEquation     = s.bEquation;
+
+            ps.burst         = s.burst;
+            ps.start         = s.start;
+            ps.duration      = s.duration;
+            ps.timeScale     = s.timeScale;
+
+            ps.spherical     = s.spherical;
             ps.pitchEquation = s.pitchEquation;
             ps.yawEquation   = s.yawEquation;
             ps.distEquation  = s.distEquation;
 
-            ps.init_buffer();
-            ps.init_shaders();
+            ps.cartesian     = s.cartesian;
+            ps.xEquation     = s.xEquation;
+            ps.yEquation     = s.yEquation;
+            ps.zEquation     = s.zEquation;
+
+            ps.rEquation     = s.rEquation;
+            ps.gEquation     = s.gEquation;
+            ps.bEquation     = s.bEquation;
+            ps.alphaEquation = s.alphaEquation;
+
+            ps.init();
         }
 
         updateSidebar();
     });
 }
 
+// Изтрива елементите от стария sidebar, ако има такива
+// и за всяка една система от systems създава ново entry
 function updateSidebar() {
-    const systems_ul = id('systems');
+    const systems_ul = document.getElementById('systems');
 
     while (systems_ul.firstChild)
         systems_ul.removeChild(systems_ul.firstChild);
@@ -455,14 +583,26 @@ function updateSidebar() {
     for (const ps of systems) {
         var li = mk('li');
 
-        mkselector(li, "Взрив", ps, 'burst', 'boolean');
         mkselector(li, "Брой частици", ps, 'particleCount');
-        mkselector(li, "Time Scale", ps, 'timeScale');
-        mkselector(li, "Размер", ps, 'sizeEquation');
-        mkselector(li, "Прозрачност", ps, 'alphaEquation');
+        mkselector(li, "Текстура",     ps, 'texture');
+        mkselector(li, "Размер",       ps, 'sizeEquation');
+        mkseparator(li);
+
+        mkselector(li, "Взрив", ps, 'burst', 'boolean', update_burst);
+        const start = mkselector(li, "Начало",       ps, 'start');
+        const dur = mkselector(li, "Продължителност", ps, 'duration');
+        const ts = mkselector(li, "Time Scale",   ps, 'timeScale');
+        mkseparator(li);
+
 
         let cartesian = [];
         let spherical = [];
+
+        function update_burst(b) {
+            start.style.display = b ? "flex" : "none";
+            dur.style.display   = b ? "flex" : "none";
+            ts.style.display    = b ? "none" : "flex";
+        }
 
         function update_visible_coordinates (cr)  {
             for (var c of cartesian) 
@@ -478,11 +618,14 @@ function updateSidebar() {
         cartesian.push(mkselector(li, "Y", ps, 'yEquation'));
         cartesian.push(mkselector(li, "Z", ps, 'zEquation'));
 
+        mkseparator(li);
         mkselector(li, "Сферични координати", ps, 'spherical', 'boolean', update_visible_coordinates_spherical);
         spherical.push(mkselector(li, "Pitch", ps, 'pitchEquation'));
         spherical.push(mkselector(li, "Yaw", ps, 'yawEquation'));
         spherical.push(mkselector(li, "Distance", ps, 'distEquation'));
+        mkseparator(li);
 
+        update_burst(ps.burst);
         update_visible_coordinates(ps.cartesian);
         update_visible_coordinates_spherical(ps.spherical);
 
@@ -499,6 +642,7 @@ function updateSidebar() {
         cartesian.push(mkselector(li, "R", ps, 'rEquation'));
         cartesian.push(mkselector(li, "G", ps, 'gEquation'));
         cartesian.push(mkselector(li, "B", ps, 'bEquation'));
+        mkselector(li, "Прозрачност",  ps, 'alphaEquation');
 
         var bottom_div = mk('div');
         bottom_div.appendChild(delete_btn);
@@ -509,39 +653,48 @@ function updateSidebar() {
     }
 }
 
-
 function main() {
-    canvas = id('glcanvas');
+    canvas = document.getElementById('glcanvas');
 
+    // Handler-и за дърпане с мишка
     canvas.onmousedown = beginDrag;
     canvas.onmouseup = endDrag;
     canvas.onmousemove = onMouseMove;
 
-    id('load').onchange = load;
+    // Ако потребителя качи файл със 'Зареди' бутона,
+    // извикваме функцията за зареждане
+    document.getElementById('loadFiles').onchange = load;
 
+    // Инициализация на WebGL
     gl = canvas.getContext('webgl');
     if (!gl) {
         alert('Нямаме WebGL');
         return;
     }
 
+    // TODO - това не трябва да е тук
     random1 = new Array(50000);
     for (var i = 0; i < 100000; i++) {
         random1[i] = (Math.random() - 0.5) * 2;
     }
 
+    var animLengthInput = document.getElementById('animLengthInput');
+    animLengthInput.value = animation_duration;
+    animLengthInput.onchange = _ => {
+        animation_duration = animLengthInput.value;
+    }
+
+
     projMatrix = mat4.create();
-    mat4.perspective(projMatrix, 45 * Math.PI / 180, gl.canvas.clientWidth / gl.canvas.clientHeight, 0.1, 100);
+    mat4.perspective(
+        projMatrix, 
+        45 * Math.PI / 180, gl.canvas.clientWidth / gl.canvas.clientHeight, 
+        0.1, 
+        100);
 
     viewMatrixBase = mat4.create();
     mat4.translate(viewMatrixBase, viewMatrixBase, [-0.0, 0.0, -5.0]);  
     viewMatrix = mat4.clone(viewMatrixBase);
-
-    // Load the texture
-    texture = loadTexture("default-particle.png");
-    
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE0, texture);
 
     gl.enable(gl.CULL_FACE);
     gl.cullFace(gl.BACK);
@@ -554,12 +707,19 @@ function main() {
     drawScene(0);
 }
 
-var time = 0;
-var now = performance.now();
-
 
 function drawScene() {
+    let didDrawASystem = false;
+
     for (const ps of systems) {
+        if (ps.broken)
+            continue;
+
+        if (ps.burst && (time < ps.start || time > ps.start + ps.duration))
+            continue;
+
+        didDrawASystem = true;
+
         gl.bindBuffer(gl.ARRAY_BUFFER, ps.buffer);
         
         gl.vertexAttribPointer(ps.programInfo.vertexPosition, 4, gl.FLOAT, false, 12 * 4, 0);
@@ -571,6 +731,8 @@ function drawScene() {
         }
         
         gl.useProgram(ps.program);
+
+        gl.activeTexture(gl.TEXTURE0);
         
         // Pass Texture
         gl.uniform1i(ps.sampler, 0);
@@ -583,8 +745,15 @@ function drawScene() {
         gl.uniformMatrix4fv(ps.programInfo.viewMatrix,  false, viewMatrix);
         
         // Pass Time
-        var t = time * ps.timeScale;
-        t -= Math.floor(t);
+        var t;
+        if (ps.burst) {
+            t = time - ps.start;
+            t /= ps.duration;
+        }
+        else {
+            t = time * ps.timeScale;
+            t -= Math.floor(t);
+        }
         gl.uniform1f(ps.programInfo.time, t);
         
         gl.drawElements(gl.TRIANGLES, ps.particleCount * 6, gl.UNSIGNED_SHORT, 0);
@@ -593,21 +762,21 @@ function drawScene() {
             gl.disableVertexAttribArray(ps.programInfo.random1);
     }
 
-
     var new_now = performance.now();
     var dt = new_now - now;
     now = new_now;
 
-    if (systems.length > 0) {
-        time += dt / 1000;
-    }
-    else {
+    time += dt / 1000;
+    if (time > animation_duration)
         time = 0;
+
+    // Ако нямаме нарисувана система трябва да изчистим екрана
+    if (!didDrawASystem) {
         gl.clearColor(0,0,0,1);
         gl.clear(gl.COLOR_BUFFER_BIT);
     }
 
-    id('time').innerText = "Време: " + time.toFixed(2);
+    document.getElementById('time').innerText = "Време: " + time.toFixed(2);
 
     requestAnimationFrame(() => { 
         drawScene(); 
@@ -617,6 +786,9 @@ function drawScene() {
 function makeShaderProgram(gl, vert, frag) {
     const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vert);
     const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, frag);
+
+    if (!vertexShader || !fragmentShader)
+        return null;
 
     const shaderProgram = gl.createProgram();
     gl.attachShader(shaderProgram, vertexShader);
@@ -640,6 +812,10 @@ function compileShader(gl, type, source) {
         return null;
     }
     return shader;
+}
+
+function loadPresets() {
+
 }
 
 main();

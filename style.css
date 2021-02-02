@@ -7,7 +7,6 @@ body, html {
     padding: 0;
     height: 100%;
     font-family: sans-serif;
-
 }
 
 body {
@@ -28,55 +27,63 @@ body {
 canvas {
     border-radius: 10px;
     background: black;
-    flex: 0 0 800px;
-    height: 600px;
+    flex: 0 0 600px;
 }
 
 #sidebar {
-    flex: 0 0 350px;
+    font-size: 15px;
+    flex: 0 1 400px;
     background: #ccc;
-    border-left: 1px solid #aaa;
+    border-left: 1px solid #999;
     padding: 0px;
-
-    display: flex;
-    flex-direction: column;
+    overflow-y: scroll;
+    max-height: 100%;
+    padding: 3px;
 }
 
-#systems {
+#systems, #macros {
     padding: 0;
     margin: 0;
     list-style-type: none;
-
-    overflow-y: scroll;
     box-sizing: border-box;
+    min-height: 0;
+}
+
+#macros {
+    flex: 1 0 auto;
+}
+
+#systems {
+    flex: 3 0 auto;
 }
 
 .input, input, button {
+    font-family: inherit;
+    font-size: 14px;
     background: #f7f7f7;
     border: 1px solid #aaa;
-    padding: 3px 10px;
-    margin: 3px 5px;
-    border-radius: 4px;
-    min-width: 0;
+
+    border-radius: 2px;
     color: #222;
+
+    padding: 4px 8px 2px 8px;
 }
 
-button, .input {
-    font-family: inherit;
-    font-size: inherit;
-    padding: 8px 20px 5px 20px;
+.input, button {
     cursor: pointer;
-    color: black;
 }
 
 input:focus, 
 button:hover, 
 .input:hover {
     background: white;
+    border-color: black;
+    outline: none;
 }
 
 .red_button {
-    background: #f28395;
+    background: #f7637b;
+    border-color: #99182d;
 }
 
 .red_button:hover {
@@ -84,15 +91,15 @@ button:hover,
 }
 
 #systems > li {
-    margin: 5px;
-    padding: 15px 5px;
+    margin: 3px;
+    padding: 8px 6px;
     background: #eee;
     border: 1px solid #aaa;
-    border-radius: 5px;
+    border-radius: 3px;
 }
 
 #systems > li > * {
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 
 #systems > li >  * {
@@ -113,8 +120,20 @@ button:hover,
     box-sizing: border-box;
 }
 
-input, button { 
+.separator {
+    background: #aaa;
+    height: 1px;
+    padding: 0;
+    margin: 8px;
+}
 
+.macro {
+    background: red;
+    display: flex;
+}
+
+.macro > input {
+    flex: 1 0 0;
 }
 
 video {

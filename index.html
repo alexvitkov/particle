@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>гига-мощната система за частици</title>
     <link rel="stylesheet" href="style.css" type="text/css">
+    <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
   </head>
 
   <body>
@@ -17,8 +18,21 @@
 
         <div>
             <button onclick="save()">Запиши</button>
-            <label for="load" class="input">Зареди</label>
+            <label for="loadFiles" class="input">Зареди</label>
         </div>
+
+        <div class="separator"></div>
+
+        <div>
+            <span>Дължина на анимацията</span>
+            <input id="animLengthInput" type="number" value="5">
+        </div>
+        <div class="separator"></div>
+
+        <button onclick="createMacro()">Добави макро</button>
+        <ul id="macros"> </ul>
+
+        <div class="separator"></div>
 
         <button onclick="createSystem()">Добави система</button>
 
@@ -27,7 +41,7 @@
 
     </div>
 
-    <input type="file" style="display:none;" id="load" accept=".json">
+    <input type="file" style="display:none;" id="loadFiles" accept=".json">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js" crossorigin="anonymous"></script>
     <script src="gl.js" defer></script>
