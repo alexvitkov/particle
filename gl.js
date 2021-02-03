@@ -719,7 +719,15 @@ function loadPresets() {
 }
 
 function main() {
+
     loadPresets();
+
+    const preset = decodeURIComponent(window.location.search);
+    const match = preset.match(/^\?preset=(.*)$/);
+    if (match && match.length > 1) {
+        load_from_preset(match[1]);
+    }
+
 
     canvas = document.getElementById('glcanvas');
 
